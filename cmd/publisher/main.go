@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
+	"securemqtt/internal"
+	"securemqtt/internal/crypto"
 	mqttClient "securemqtt/internal/mqtt"
 )
 
@@ -24,12 +28,32 @@ func main() {
 	topic := "topicX"
 
 	for {
-		message := fmt.Sprintf("Message at %s", time.Now().Format(time.RFC3339))
+		plaintext := fmt.Sprintf("Message at %s", time.Now().Format(time.RFC3339))
 
-		if err := client.Publish(topic, 0, false, []byte(message)); err != nil {
+		nonce, ciphertext, err := crypto.Encrypt(crypto.HardcodedKey, []byte(plaintext))
+		if err != nil {
+			log.Printf("encrypt error: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		envelope := internal.Envelope{
+			Version:    "v1",
+			Nonce:      base64.StdEncoding.EncodeToString(nonce),
+			Ciphertext: base64.StdEncoding.EncodeToString(ciphertext),
+		}
+
+		raw, err := json.Marshal(envelope)
+		if err != nil {
+			log.Printf("marshal error: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		if err := client.Publish(topic, 0, false, raw); err != nil {
 			log.Printf("publish error: %v", err)
 		} else {
-			fmt.Println("Published:", message)
+			fmt.Println("Published:", plaintext)
 		}
 
 		time.Sleep(5 * time.Second)
