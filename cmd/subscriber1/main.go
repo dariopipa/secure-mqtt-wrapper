@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"securemqtt/internal"
@@ -17,10 +16,12 @@ func main() {
 		ClientID:  "subscriber-1",
 	})
 	if err != nil {
-		log.Fatalf("connect error: %v", err)
+		log.Fatalf("[SUB-1] Failed to connect to broker: %v", err)
 	}
 
-	fmt.Println("Subscriber 1 connected (EXAMPLE --- AUTHORIZED)")
+	log.Println("[SUB-1] Connected to broker")
+	log.Println("[SUB-1] Status    : AUTHORIZED (holds correct key)")
+	log.Println("[SUB-1] Listening : topicX")
 
 	topic := "topicX"
 
@@ -28,31 +29,42 @@ func main() {
 
 		var envelope internal.Envelope
 		if err := json.Unmarshal(message.Payload, &envelope); err != nil {
-			log.Printf("[Sub-1] bad envelope: %v", err)
+			log.Printf("[SUB-1] Bad envelope: %v", err)
 			return
 		}
 
 		nonce, err := base64.StdEncoding.DecodeString(envelope.Nonce)
 		if err != nil {
-			log.Printf("[Sub-1] bad nonce: %v", err)
+			log.Printf("[SUB-1] Bad nonce: %v", err)
 			return
 		}
 
 		ciphertext, err := base64.StdEncoding.DecodeString(envelope.Ciphertext)
 		if err != nil {
-			log.Printf("[Sub-1] bad ciphertext: %v", err)
+			log.Printf("[SUB-1] Bad ciphertext: %v", err)
 			return
 		}
 
-		plaintext, err := crypto.Decrypt(crypto.HardcodedKey, nonce, ciphertext)
+		aad := crypto.BuildAAD(message.Topic, envelope.Policy, envelope.Version)
+
+		plaintext, err := crypto.Decrypt(crypto.HardcodedKey, nonce, ciphertext, aad)
+		log.Printf("[SUB-1] ========================================")
+		log.Printf("[SUB-1] Message received")
+		log.Printf("[SUB-1]   Topic     : %s", message.Topic)
+		log.Printf("[SUB-1]   Policy    : %s", envelope.Policy)
+		log.Printf("[SUB-1]   AAD       : %s", aad)
+		log.Printf("[SUB-1]   Nonce     : %s", envelope.Nonce)
+		log.Printf("[SUB-1]   Ciphertext: %s...", envelope.Ciphertext[:20])
 		if err != nil {
-			log.Printf("[Sub-1] decryption failed: %v", err)
+			log.Printf("[SUB-1]   Result    : ✗ DECRYPTION FAILED — %v", err)
 			return
+		} else {
+			log.Printf("[SUB-1]   Result    : ✓ SUCCESS")
+			log.Printf("[SUB-1]   Plaintext : %s", plaintext)
 		}
-
-		fmt.Printf("[Subscriber 1] ✓ Decrypted: %s\n", plaintext)
+		log.Printf("[SUB-1] ========================================")
 	}); err != nil {
-		log.Fatalf("subscribe error: %v", err)
+		log.Fatalf("[SUB-1] Subscribe error: %v", err)
 	}
 
 	select {}
