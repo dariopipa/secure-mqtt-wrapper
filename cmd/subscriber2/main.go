@@ -11,6 +11,8 @@ import (
 )
 
 func main() {
+
+	// Create & connect to MQTT client
 	client, err := mqttClient.NewMQTTClient(mqttClient.Config{
 		BrokerURL: "tcp://broker:1883",
 		ClientID:  "subscriber-2",
@@ -23,51 +25,51 @@ func main() {
 	log.Println("[SUB-2] Status    : UNAUTHORIZED (wrong key — simulating policy mismatch)")
 	log.Println("[SUB-2] Listening : topicX")
 
+	// MQTT Topic
 	topic := "topicX"
 
-	// Simulates a subscriber that does not hold the correct key.
-	// In Step 3 this becomes: attributes that don't satisfy the CP-ABE policy.
-	wrongKey, err := crypto.GenerateKey()
-	if err != nil {
-		log.Fatalf("[SUB-2] Key generation error: %v", err)
-	}
+	// Simulates subscriber that does not hold the correct key
+	wrongKey, _ := crypto.GenerateKey()
 
+	// Subscribe to it with a QoS of 0
+	// Call a handler function for each message received
 	if err := client.Subscribe(topic, 0, func(message mqttClient.Message) {
 
+		// Parse the JSON payload into Envelope struct
 		var envelope internal.Envelope
 		if err := json.Unmarshal(message.Payload, &envelope); err != nil {
 			log.Printf("[SUB-2] Bad envelope: %v", err)
 			return
 		}
 
-		nonce, err := base64.StdEncoding.DecodeString(envelope.Nonce)
+		// Decode Base64 IV into raw bytes
+		iv, err := base64.StdEncoding.DecodeString(envelope.Nonce)
 		if err != nil {
 			log.Printf("[SUB-2] Bad nonce: %v", err)
 			return
 		}
 
+		// Decode Base64 ciphertext string into raw bytes
 		ciphertext, err := base64.StdEncoding.DecodeString(envelope.Ciphertext)
 		if err != nil {
 			log.Printf("[SUB-2] Bad ciphertext: %v", err)
 			return
 		}
 
+		// Rebuild AAD
 		aad := crypto.BuildAAD(message.Topic, envelope.Policy, envelope.Version)
 
-		_, err = crypto.Decrypt(wrongKey, nonce, ciphertext, aad)
-		log.Printf("[SUB-2] ========================================")
-		log.Printf("[SUB-2] Message received")
-		log.Printf("[SUB-2]   Topic     : %s", message.Topic)
-		log.Printf("[SUB-2]   Policy    : %s", envelope.Policy)
-		log.Printf("[SUB-2]   AAD       : %s", aad)
-		log.Printf("[SUB-2]   Nonce     : %s", envelope.Nonce)
-		log.Printf("[SUB-2]   Ciphertext: %s...", envelope.Ciphertext[:20])
+		// Decrypt
+		plaintext, err := crypto.Decrypt(wrongKey, iv, ciphertext, aad)
+
 		if err != nil {
 			log.Printf("[SUB-2]   Result    : ✗ DECRYPTION FAILED (as expected — wrong key)")
-		} else {
-			log.Fatalf("[SUB-2]   Result    : SECURITY ERROR — decryption succeeded with wrong key!")
+			return
+
 		}
-		log.Printf("[SUB-2] ========================================")
+
+		// Shouldn't reach this
+		log.Fatalf("[SUB-2] SECURITY ERROR — decryption succeeded with wrong key! Plaintext: %s", plaintext)
 	}); err != nil {
 		log.Fatalf("[SUB-2] Subscribe error: %v", err)
 	}
