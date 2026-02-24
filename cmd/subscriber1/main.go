@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	mqttClient "securemqtt/utility/abstractions"
+	mqttClient "securemqtt/internal/mqtt"
 )
 
 func main() {

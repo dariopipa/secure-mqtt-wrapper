@@ -1,4 +1,4 @@
-package abstractions
+package mqtt
 
 import (
 	"fmt"

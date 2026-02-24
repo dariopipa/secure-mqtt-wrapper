@@ -11,7 +11,7 @@ services:
   publisher:
     build:
       context: .
-      dockerfile: publisher/Dockerfile
+      dockerfile: cmd/publisher/Dockerfile
     container_name: go-publisher
     depends_on:
       - broker
@@ -20,7 +20,7 @@ services:
   subscriber1:
     build:
       context: .
-      dockerfile: subscriber1/Dockerfile
+      dockerfile: cmd/subscriber1/Dockerfile
     container_name: go-subscriber-1
     depends_on:
       - broker
@@ -29,7 +29,7 @@ services:
   subscriber2:
     build:
       context: .
-      dockerfile: subscriber2/Dockerfile
+      dockerfile: cmd/subscriber2/Dockerfile
     container_name: go-subscriber-2
     depends_on:
       - broker
