@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"io"
 )
@@ -13,8 +12,6 @@ import (
 // 16 bytes - 128-bit key (AES-128).
 const KeySize = 16
 
-// To be replaced by CP-ABE
-var HardcodedKey, _ = hex.DecodeString("e0b93100018d417c7a25b447c2633059")
 
 // Generate fresh random symmetric key of KeySize bytes.
 func GenerateKey() ([]byte, error) {
