@@ -42,9 +42,8 @@ func main() {
 		// Publish payload to topic
 		if err := secureClient.PublishSecure(topic, 0, false, plaintext, policy); err != nil {
 			log.Printf("[PUBLISHER] Failed to publish: %v", err)
-		} else {
-			log.Printf("[PUBLISHER]")
 		}
+
 		time.Sleep(5 * time.Second)
 	}
 }
