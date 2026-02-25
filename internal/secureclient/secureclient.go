@@ -79,6 +79,20 @@ func (strct *SecureClient) PublishSecure(topic string, qos byte, retained bool,
 		return fmt.Errorf("%s PublishSecure: marshal.", err)
 	}
 
+	log.Printf(
+		"[PUBLISHER] Envelope\n"+
+			"  Topic        : %s\n"+
+			"  Policy       : %s\n"+
+			"  Version      : %s\n"+
+			"  CP-ABE CT    : %d bytes\n"+
+			"  AES CT       : %d bytes\n",
+		topic,
+		policy,
+		envelope.Version,
+		len(cpCipherTextBytes),
+		len(aesCipherTextBytes),
+	)
+
 	// Publish to MQTT
 	return strct.mqttClient.Publish(topic, qos, retained, envelopeJSON)
 }
@@ -105,7 +119,14 @@ func (strct *SecureClient) SubscribeSecure(topic string, qos byte,
 		// Decrypt session key with CP-ABE
 		sessionKey, err := strct.subscriberABE.DecryptKey(strct.privateKeyBytes, cpCipherTextBytes)
 		if err != nil {
-			log.Printf("%s   Result    : ✗ DECRYPTION FAILED — attributes do not satisfy policy.", err)
+			log.Printf(
+				"[SUBSCRIBER] Access Denied\n"+
+					"  Topic   : %s\n"+
+					"  Policy  : %s\n"+
+					"  Reason  : Attributes do not satisfy policy\n",
+				msg.Topic,
+				envelope.Policy,
+			)
 			return
 		}
 
@@ -127,10 +148,25 @@ func (strct *SecureClient) SubscribeSecure(topic string, qos byte,
 		// Decrypt ciphertext with AES
 		plaintext, err := strct.aesCryptography.Decrypt(sessionKey, iv, aesCipherTextBytes, aad)
 		if err != nil {
-			log.Printf("%s   Result    : ✗ AES-GCM auth failed.", err)
+			log.Printf(
+				"[SUBSCRIBER] AES-GCM Authentication Failed\n"+
+					"  Topic   : %s\n"+
+					"  Policy  : %s\n",
+				msg.Topic,
+				envelope.Policy,
+			)
 			return
 		}
 
+		log.Printf(
+			"[SUBSCRIBER] Message Decrypted\n"+
+				"  Topic   : %s\n"+
+				"  Policy  : %s\n"+
+				"  Size    : %d bytes\n",
+			msg.Topic,
+			envelope.Policy,
+			len(plaintext),
+		)
 		handler(msg.Topic, plaintext)
 	})
 }
