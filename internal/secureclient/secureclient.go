@@ -9,11 +9,11 @@ import (
 	"securemqtt/internal"
 	"securemqtt/internal/abe"
 	aescryptography "securemqtt/internal/aes"
-	mqttClient "securemqtt/internal/mqtt"
+	"securemqtt/internal/clientmqtt"
 )
 
 type SecureClient struct {
-	mqttClient      mqttClient.Client
+	mqttClient      clientmqtt.IMQTT
 	publisherABE    abe.IPublisherABE
 	subscriberABE   abe.ISubscriberABE
 	aesCryptography aescryptography.IAESCryptography
@@ -23,7 +23,7 @@ type SecureClient struct {
 
 // Constructor
 func NewSecureClient(
-	mqttClient mqttClient.Client,
+	mqttClient clientmqtt.IMQTT,
 	publisherABE abe.IPublisherABE,
 	subscriberABE abe.ISubscriberABE,
 	aesCryptography aescryptography.IAESCryptography,
@@ -87,7 +87,7 @@ func (strct *SecureClient) PublishSecure(topic string, qos byte, retained bool,
 func (strct *SecureClient) SubscribeSecure(topic string, qos byte,
 	handler func(topic string, plaintext []byte)) error {
 
-	return strct.mqttClient.Subscribe(topic, qos, func(msg mqttClient.Message) {
+	return strct.mqttClient.Subscribe(topic, qos, func(msg internal.Message) {
 
 		var envelope internal.Envelope
 		if err := json.Unmarshal(msg.Envelope, &envelope); err != nil {

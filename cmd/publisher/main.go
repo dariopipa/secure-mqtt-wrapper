@@ -8,7 +8,7 @@ import (
 
 	"securemqtt/internal/abe"
 	aescryptography "securemqtt/internal/aes"
-	mqttClient "securemqtt/internal/mqtt"
+	"securemqtt/internal/clientmqtt"
 	"securemqtt/internal/secureclient"
 )
 
@@ -28,10 +28,7 @@ func main() {
 	}
 
 	// Create & connect MQTT client using wrapper through broker address & client ID
-	client, err := mqttClient.NewMQTTClient(mqttClient.Config{
-		BrokerURL: "tcp://broker:1883",
-		ClientID:  "publisher-client",
-	})
+	client, err := clientmqtt.NewMQTT(brokerURL, clientID)
 	if err != nil {
 		log.Fatalf("[PUBLISHER] Failed to connect to broker: %v", err)
 	}
