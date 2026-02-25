@@ -44,8 +44,8 @@ func (p *pahoClient) Publish(topic string, qos byte, retained bool, payload []by
 func (p *pahoClient) Subscribe(topic string, qos byte, handler Handler) error {
 	token := p.client.Subscribe(topic, qos, func(_ paho.Client, msg paho.Message) {
 		handler(Message{
-			Topic:   msg.Topic(),
-			Payload: msg.Payload(),
+			Topic:    msg.Topic(),
+			Envelope: msg.Payload(),
 		})
 	})
 

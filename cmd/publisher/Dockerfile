@@ -9,4 +9,6 @@ COPY . .
 
 RUN go build -o publisher ./cmd/publisher
 
+VOLUME ["/keys"]
+
 CMD ["./publisher"]

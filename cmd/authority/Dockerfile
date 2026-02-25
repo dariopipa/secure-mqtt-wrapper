@@ -7,8 +7,8 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o subscriber1 ./cmd/subscriber1
+RUN go build -o authority ./cmd/authority
 
 VOLUME ["/keys"]
 
-CMD ["./subscriber1"]
+CMD ["./authority"]

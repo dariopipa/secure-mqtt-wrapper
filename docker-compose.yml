@@ -1,5 +1,8 @@
 version: "3.8"
 
+volumes:
+  keys_volume:
+
 services:
   broker:
     image: eclipse-mosquitto:2
@@ -8,13 +11,25 @@ services:
       - "1883:1883"
     restart: always
 
+  authority:
+    build:
+      context: .
+      dockerfile: cmd/authority/Dockerfile
+    container_name: cpabe-authority
+    volumes:
+      - keys_volume:/keys
+    restart: "no"
+
   publisher:
     build:
       context: .
       dockerfile: cmd/publisher/Dockerfile
     container_name: go-publisher
+    volumes:
+      - keys_volume:/keys
     depends_on:
       - broker
+      - authority
     restart: on-failure
 
   subscriber1:
@@ -22,8 +37,11 @@ services:
       context: .
       dockerfile: cmd/subscriber1/Dockerfile
     container_name: go-subscriber-1
+    volumes:
+      - keys_volume:/keys
     depends_on:
       - broker
+      - authority
     restart: on-failure
 
   subscriber2:
@@ -31,6 +49,9 @@ services:
       context: .
       dockerfile: cmd/subscriber2/Dockerfile
     container_name: go-subscriber-2
+    volumes:
+      - keys_volume:/keys
     depends_on:
       - broker
+      - authority
     restart: on-failure

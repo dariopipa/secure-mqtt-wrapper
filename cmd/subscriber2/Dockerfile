@@ -9,4 +9,6 @@ COPY . .
 
 RUN go build -o subscriber2 ./cmd/subscriber2
 
+VOLUME ["/keys"]
+
 CMD ["./subscriber2"]

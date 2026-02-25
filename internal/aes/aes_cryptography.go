@@ -1,4 +1,4 @@
-package crypto
+package aescryptography
 
 import (
 	"crypto/aes"
@@ -8,13 +8,15 @@ import (
 	"io"
 )
 
+type AESCryptography struct {
+}
+
 // Byte number used by symmetric key
 // 16 bytes - 128-bit key (AES-128).
 const KeySize = 16
 
-
 // Generate fresh random symmetric key of KeySize bytes.
-func GenerateKey() ([]byte, error) {
+func (strct *AESCryptography) GenerateKey() ([]byte, error) {
 
 	// Allocate a byte slice of length KeySize.
 	secretKey := make([]byte, KeySize)
@@ -32,7 +34,7 @@ func GenerateKey() ([]byte, error) {
 // 1. Topic -> Prevents copying ciphertext to another topic and still decrypting
 // 2. Policy -> Prevents swapping policy strings while keeping ciphertext
 // 3. Version -> Prevents mixing versions
-func BuildAAD(topic, policy, version string) []byte {
+func (strct *AESCryptography) BuildAAD(topic, policy, version string) []byte {
 	// Concatenate with '|' delimiter so fields are distinguishable.
 	return []byte(fmt.Sprintf("%s|%s|%s", version, topic, policy))
 }
@@ -45,7 +47,7 @@ func BuildAAD(topic, policy, version string) []byte {
 // Function will provide us with:
 // 1. IV -> Unique per encryption under same key
 // 2. Ciphertext -> Encrypted bytes + authentication tag appended
-func Encrypt(key, plaintext, aad []byte) (iv, ciphertext []byte, err error) {
+func (strct *AESCryptography) Encrypt(key, plaintext, aad []byte) (iv, ciphertext []byte, err error) {
 
 	// Create AES block cipher from the key
 	block, err := aes.NewCipher(key)
@@ -79,7 +81,7 @@ func Encrypt(key, plaintext, aad []byte) (iv, ciphertext []byte, err error) {
 // 1. Secret key
 // 2. IV - same one used for encryption
 // 3. AAD
-func Decrypt(key, nonce, ciphertext, aad []byte) ([]byte, error) {
+func (strct *AESCryptography) Decrypt(key, nonce, ciphertext, aad []byte) ([]byte, error) {
 
 	// Build block cipher from key
 	block, err := aes.NewCipher(key)

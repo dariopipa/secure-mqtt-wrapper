@@ -1,16 +1,30 @@
 package main
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"time"
 
-	"securemqtt/internal"
-	"securemqtt/internal/crypto"
+	"securemqtt/internal/abe"
+	aescryptography "securemqtt/internal/aes"
 	mqttClient "securemqtt/internal/mqtt"
+	"securemqtt/internal/secureclient"
+)
+
+const (
+	attrKeyPath = "/keys/sub2.key"
+	brokerURL   = "tcp://broker:1883"
+	clientID    = "subscriber-2"
+	topic       = "topicX"
 )
 
 func main() {
+
+	privateKeyBytes, err := waitForKey(attrKeyPath)
+	if err != nil {
+		log.Fatalf("Failed to load attribute key: %v", err)
+	}
 
 	// Create & connect to MQTT client
 	client, err := mqttClient.NewMQTTClient(mqttClient.Config{
@@ -21,58 +35,31 @@ func main() {
 		log.Fatalf("[SUB-2] Failed to connect to broker: %v", err)
 	}
 
-	log.Println("[SUB-2] Connected to broker at tcp://broker:1883")
-	log.Println("[SUB-2] Status    : UNAUTHORIZED (wrong key — simulating policy mismatch)")
-	log.Println("[SUB-2] Listening : topicX")
+	secureClient := secureclient.NewSecureClient(client, &abe.PublisherABE{}, &abe.SubscriberABE{},
+		&aescryptography.AESCryptography{}, nil, privateKeyBytes)
 
-	// MQTT Topic
-	topic := "topicX"
-
-	// Simulates subscriber that does not hold the correct key
-	wrongKey, _ := crypto.GenerateKey()
-
-	// Subscribe to it with a QoS of 0
-	// Call a handler function for each message received
-	if err := client.Subscribe(topic, 0, func(message mqttClient.Message) {
-
-		// Parse the JSON payload into Envelope struct
-		var envelope internal.Envelope
-		if err := json.Unmarshal(message.Payload, &envelope); err != nil {
-			log.Printf("[SUB-2] Bad envelope: %v", err)
-			return
-		}
-
-		// Decode Base64 IV into raw bytes
-		iv, err := base64.StdEncoding.DecodeString(envelope.Nonce)
-		if err != nil {
-			log.Printf("[SUB-2] Bad nonce: %v", err)
-			return
-		}
-
-		// Decode Base64 ciphertext string into raw bytes
-		ciphertext, err := base64.StdEncoding.DecodeString(envelope.Ciphertext)
-		if err != nil {
-			log.Printf("[SUB-2] Bad ciphertext: %v", err)
-			return
-		}
-
-		// Rebuild AAD
-		aad := crypto.BuildAAD(message.Topic, envelope.Policy, envelope.Version)
-
-		// Decrypt
-		plaintext, err := crypto.Decrypt(wrongKey, iv, ciphertext, aad)
-
-		if err != nil {
-			log.Printf("[SUB-2]   Result    : ✗ DECRYPTION FAILED (as expected — wrong key)")
-			return
-
-		}
-
-		// Shouldn't reach this
-		log.Fatalf("[SUB-2] SECURITY ERROR — decryption succeeded with wrong key! Plaintext: %s", plaintext)
+	if err := secureClient.SubscribeSecure(topic, 0, func(t string, plaintext []byte) {
+		// This handler must never be reached for an unauthorised subscriber.
+		// If it is, something is seriously wrong with the ABE implementation.
+		log.Fatalf("SECURITY ERROR — decryption succeeded with unauthorized key! Plaintext: %s", plaintext)
 	}); err != nil {
-		log.Fatalf("[SUB-2] Subscribe error: %v", err)
+		log.Fatalf("Subscribe error: %v", err)
 	}
 
 	select {}
+}
+
+func waitForKey(path string) ([]byte, error) {
+	log.Printf("Waiting for key file: %s", path)
+	for {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			return data, nil
+		}
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("unexpected error reading %s: %w", path, err)
+		}
+		log.Printf("Key not ready yet, retrying in 2s...")
+		time.Sleep(2 * time.Second)
+	}
 }

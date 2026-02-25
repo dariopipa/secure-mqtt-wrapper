@@ -1,16 +1,30 @@
 package main
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"time"
 
-	"securemqtt/internal"
-	"securemqtt/internal/crypto"
+	"securemqtt/internal/abe"
+	aescryptography "securemqtt/internal/aes"
 	mqttClient "securemqtt/internal/mqtt"
+	"securemqtt/internal/secureclient"
+)
+
+const (
+	attrKeyPath = "/keys/sub1.key"
+	brokerURL   = "tcp://broker:1883"
+	clientID    = "subscriber-1"
+	topic       = "topicX"
 )
 
 func main() {
+
+	privateKeyBytes, err := waitForKey(attrKeyPath)
+	if err != nil {
+		log.Fatalf("Failed to load attribute key: %v", err)
+	}
 
 	// Create & connect to MQTT client
 	client, err := mqttClient.NewMQTTClient(mqttClient.Config{
@@ -21,53 +35,32 @@ func main() {
 		log.Fatalf("[SUB-1] Failed to connect to broker: %v", err)
 	}
 
-	log.Println("[SUB-1] Connected to broker")
-	log.Println("[SUB-1] Status    : AUTHORIZED (holds correct key)")
-	log.Println("[SUB-1] Listening : topicX")
+	secureClient := secureclient.NewSecureClient(client, &abe.PublisherABE{}, &abe.SubscriberABE{},
+		&aescryptography.AESCryptography{}, nil, privateKeyBytes)
 
-	// MQTT Topic
-	topic := "topicX"
-
-	// Subscribe to it with a QoS of 0
-	// Call a handler function for each message received
-	if err := client.Subscribe(topic, 0, func(message mqttClient.Message) {
-
-		// Parse the JSON payload into Envelope struct
-		var envelope internal.Envelope
-		if err := json.Unmarshal(message.Payload, &envelope); err != nil {
-			log.Printf("[SUB-1] Bad envelope: %v", err)
-			return
-		}
-
-		// Decode Base64 IV into raw bytes
-		iv, err := base64.StdEncoding.DecodeString(envelope.Nonce)
-		if err != nil {
-			log.Printf("[SUB-1] Bad nonce: %v", err)
-			return
-		}
-
-		// Decode Base64 ciphertext string into raw bytes
-		ciphertext, err := base64.StdEncoding.DecodeString(envelope.Ciphertext)
-		if err != nil {
-			log.Printf("[SUB-1] Bad ciphertext: %v", err)
-			return
-		}
-
-		// Rebuild AAD
-		aad := crypto.BuildAAD(message.Topic, envelope.Policy, envelope.Version)
-
-		// Decrypt
-		plaintext, err := crypto.Decrypt(crypto.HardcodedKey, iv, ciphertext, aad)
-		if err != nil {
-			log.Printf("[SUB-1]   Result    : ✗ DECRYPTION FAILED — %v", err)
-			return
-		} else {
-			log.Printf("[SUB-1]   Result    : ✓ SUCCESS")
-			log.Printf("[SUB-1]   Plaintext : %s", plaintext)
-		}
+	if err := secureClient.SubscribeSecure(topic, 0, func(t string, plaintext []byte) {
+		log.Printf("  Result    : ✓ SUCCESS")
+		log.Printf("  Topic     : %s", t)
+		log.Printf("  Plaintext : %s", plaintext)
 	}); err != nil {
-		log.Fatalf("[SUB-1] Subscribe error: %v", err)
+		log.Fatalf("Subscribe error: %v", err)
 	}
 
 	select {}
+}
+
+func waitForKey(path string) ([]byte, error) {
+	log.Printf("Waiting for key file: %s", path)
+
+	for {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			return data, nil
+		}
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("unexpected error reading %s: %w", path, err)
+		}
+		log.Printf("Key not ready yet, retrying in 2s...")
+		time.Sleep(2 * time.Second)
+	}
 }

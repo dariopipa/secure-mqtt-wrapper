@@ -6,8 +6,8 @@ import (
 )
 
 type Message struct {
-	Topic   string
-	Payload []byte
+	Topic    string
+	Envelope []byte
 }
 
 type Handler func(message Message)
