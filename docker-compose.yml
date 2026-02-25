@@ -18,7 +18,8 @@ services:
     container_name: cpabe-authority
     volumes:
       - keys_volume:/keys
-    restart: "no"
+    restart: unless-stopped
+    command: ["sh", "-c", "sleep infinity"]
 
   publisher:
     build:

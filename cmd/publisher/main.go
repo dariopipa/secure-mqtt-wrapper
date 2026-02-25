@@ -17,7 +17,7 @@ const (
 	brokerURL     = "tcp://broker:1883"
 	clientID      = "publisher-client"
 	topic         = "topicX"
-	policy        = "role:operator and site:rome"
+	policy        = "(role: operator) and (site: rome)"
 )
 
 func main() {
